@@ -51,3 +51,15 @@ variable "github_repo_url" {
   type        = string
   default     = "https://github.com/mujoko/E-commerce-Web-App.git"
 }
+
+variable "dd_api_key" {
+  description = "Datadog API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "dd_site" {
+  description = "Datadog site"
+  type        = string
+  default     = "us5.datadoghq.com"
+}

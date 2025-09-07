@@ -138,9 +138,11 @@ resource "aws_instance" "ecommerce_app" {
   iam_instance_profile  = aws_iam_instance_profile.ecommerce_profile.name
 
   # User data script to install and configure the Flask application
-  user_data = base64encode(templatefile("${path.module}/user-data.sh", {
+  user_data = base64encode(templatefile("${path.module}/user-data.sh.tpl", {
     github_repo_url = var.github_repo_url
     app_port        = var.app_port
+    dd_api_key      = var.dd_api_key
+    dd_site         = var.dd_site
   }))
 
   # Ensure user data runs on every boot

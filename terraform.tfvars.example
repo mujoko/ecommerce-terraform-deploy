@@ -9,3 +9,7 @@ key_pair_name       = "ecommerce-key"  # Update this to your actual key pair nam
 allowed_cidr_blocks = ["0.0.0.0/0"]   # Restrict this for better security
 app_port           = 5000
 github_repo_url    = "https://github.com/mujoko/E-commerce-Web-App.git"
+
+# Datadog configuration
+dd_api_key         = "your-datadog-api-key-here"
+dd_site           = "us5.datadoghq.com"

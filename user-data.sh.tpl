@@ -30,13 +30,91 @@ Group=ec2-user
 WorkingDirectory=/opt/ecommerce-app/app
 Environment=FLASK_APP=run.py
 Environment=FLASK_ENV=production
-ExecStart=/usr/bin/python3 run.py
+Environment=DD_SERVICE=ecommerce-flask-app
+Environment=DD_ENV=dev
+Environment=DD_VERSION=1.0.0
+ExecStart=/home/ec2-user/.local/bin/ddtrace-run python3 run.py
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
+
+# --- Datadog Agent install ---
+DD_API_KEY="${dd_api_key}" DD_SITE="${dd_site}" \
+bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script_agent7.sh)"
+
+# Enable core features (APM, logs, process); set useful tags
+sudo tee /etc/datadog-agent/datadog.yaml >/dev/null <<'YAML'
+api_key: __API_KEY__
+site: __SITE__
+
+tags:
+  - env:dev
+  - app:ecommerce
+  - team:partner-demo
+
+apm_config:
+  enabled: true
+
+logs_config:
+  logs_enabled: true
+
+process_config:
+  enabled: "true"
+  process_collection:
+    enabled: true
+YAML
+
+# Configure log collection for Nginx and Flask app
+sudo tee /etc/datadog-agent/conf.d/nginx.d/conf.yaml >/dev/null <<'YAML'
+logs:
+  - type: file
+    path: /var/log/nginx/access.log
+    service: nginx
+    source: nginx
+    sourcecategory: http_web_access
+    tags:
+      - env:dev
+      - app:ecommerce
+  - type: file
+    path: /var/log/nginx/error.log
+    service: nginx
+    source: nginx
+    sourcecategory: http_web_error
+    tags:
+      - env:dev
+      - app:ecommerce
+YAML
+
+# Configure log collection for Flask application
+sudo tee /etc/datadog-agent/conf.d/flask.d/conf.yaml >/dev/null <<'YAML'
+logs:
+  - type: journald
+    source: flask
+    service: ecommerce-flask-app
+    include_units:
+      - ecommerce-app.service
+    tags:
+      - env:dev
+      - app:ecommerce
+  - type: journald
+    source: flask-db-init
+    service: ecommerce-flask-app
+    include_units:
+      - init-ecommerce-db.service
+    tags:
+      - env:dev
+      - app:ecommerce
+      - component:database
+YAML
+
+# replace placeholders safely
+sudo sed -i "s/__API_KEY__/${dd_api_key}/" /etc/datadog-agent/datadog.yaml
+sudo sed -i "s/__SITE__/${dd_site}/" /etc/datadog-agent/datadog.yaml
+
 
 # Change ownership of application directory
 chown -R ec2-user:ec2-user /opt/ecommerce-app
@@ -158,6 +236,16 @@ if ! grep -q "include /etc/nginx/sites-enabled" /etc/nginx/nginx.conf; then
     sed -i '/include \/etc\/nginx\/conf.d/a\    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
 fi
 
+# Create nginx log directories and set permissions
+mkdir -p /var/log/nginx
+touch /var/log/nginx/access.log /var/log/nginx/error.log
+chown nginx:nginx /var/log/nginx/access.log /var/log/nginx/error.log
+chmod 644 /var/log/nginx/access.log /var/log/nginx/error.log
+
+# Create Datadog agent configuration directories
+mkdir -p /etc/datadog-agent/conf.d/nginx.d
+mkdir -p /etc/datadog-agent/conf.d/flask.d
+
 # Enable and start systemd services
 systemctl daemon-reload
 systemctl enable ecommerce-app
@@ -165,6 +253,9 @@ systemctl enable init-ecommerce-db
 # Note: Services will start after app deployment via deploy-app.sh
 systemctl enable nginx
 systemctl start nginx
+
+# Restart Datadog agent to pick up log configurations
+systemctl restart datadog-agent
 
 # Create a simple health check script
 cat > /opt/ecommerce-app/health-check.sh << EOF
