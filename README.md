@@ -1,6 +1,6 @@
 # E-commerce Application Terraform Deployment
 
-This project provides infrastructure as code (IaC) using Terraform to deploy a Python Flask e-commerce web application to AWS EC2. The application is automatically cloned from https://github.com/mujoko/E-commerce-Web-App.git and deployed with all necessary dependencies.
+This project provides infrastructure as code (IaC) using Terraform to deploy a Python Flask e-commerce web application to AWS EC2. The application uses the local `app-source/` directory which includes enhanced checkout functionality, and is deployed using a separate deployment script.
 
 ## 🏗️ Architecture Overview
 
@@ -59,7 +59,12 @@ Before deploying, ensure you have:
    ./deploy.sh apply
    ```
 
-4. **Access your application**:
+4. **Deploy the application**:
+   ```bash
+   ./deploy-app.sh
+   ```
+
+5. **Access your application**:
    - The deployment will output the application URL
    - Access via browser: `http://[instance-ip]:5000`
    - Or via Nginx proxy: `http://[instance-ip]`
@@ -79,7 +84,7 @@ instance_type       = "t3.micro"                     # EC2 instance type
 key_pair_name       = "ecommerce-key"                # Your AWS key pair name
 allowed_cidr_blocks = ["0.0.0.0/0"]                  # Restrict for better security
 app_port           = 5000                            # Flask application port
-github_repo_url    = "https://github.com/mujoko/E-commerce-Web-App.git"
+# github_repo_url is no longer used - app deployed from local app-source/
 ```
 
 ### Security Considerations
@@ -90,8 +95,9 @@ github_repo_url    = "https://github.com/mujoko/E-commerce-Web-App.git"
 
 ## 📦 Deployment Commands
 
-### Using the deployment script (recommended):
+### Two-Step Deployment Process:
 
+**Step 1: Deploy Infrastructure**
 ```bash
 # Plan deployment (see what will be created)
 ./deploy.sh plan
@@ -104,6 +110,12 @@ github_repo_url    = "https://github.com/mujoko/E-commerce-Web-App.git"
 
 # Show help
 ./deploy.sh help
+```
+
+**Step 2: Deploy Application from Local Source**
+```bash
+# Deploy the Flask app from local app-source/ directory
+./deploy-app.sh
 ```
 
 ### Manual Terraform commands:
@@ -162,21 +174,26 @@ ecommerce-terraform-deploy/
 ├── variables.tf               # Variable definitions
 ├── outputs.tf                 # Output definitions
 ├── terraform.tfvars.example   # Example variable values
-├── user-data.sh              # EC2 user data script
-├── deploy.sh                 # Deployment automation script
+├── user-data.sh              # EC2 user data script (infrastructure only)
+├── deploy.sh                 # Infrastructure deployment script
+├── deploy-app.sh             # Application deployment script
 ├── manage-app.sh             # Application management script
 ├── README.md                 # This documentation
 ├── .gitignore               # Git ignore rules
-└── app-source/              # Cloned e-commerce application
-    └── E-commerce-Web-App/  # Original application code
+└── app-source/              # Local e-commerce application with checkout
+    ├── unwrap/              # Flask application package
+    ├── requirements.txt     # Python dependencies
+    ├── run.py              # Application entry point
+    └── products.csv        # Sample product data
 ```
 
 ## 🔧 Application Details
 
 ### Flask Application Features:
 - User registration and authentication
-- Product catalog
+- Product catalog with sample products
 - Shopping cart functionality
+- **Complete checkout and order confirmation flow**
 - SQLite database (SQLAlchemy)
 - Bootstrap frontend
 
@@ -229,10 +246,9 @@ ecommerce-terraform-deploy/
 ## 🔄 Updates and Maintenance
 
 ### Updating the Application:
-1. SSH into the instance
-2. Navigate to `/opt/ecommerce-app/app`
-3. Pull latest changes: `git pull origin main`
-4. Restart the service: `sudo systemctl restart ecommerce-app`
+1. Modify files in the local `app-source/` directory
+2. Run the deployment script: `./deploy-app.sh`
+3. The script will copy updated files and restart the application
 
 ### Updating Infrastructure:
 1. Modify Terraform files as needed
